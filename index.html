@@ -1,0 +1,462 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Litz Loss Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600&display=swap">
+<style>
+/* Layout: bench-instrument feel. Inputs on the left rail, readouts and one frequency chart on the right, derivation below. */
+:root{
+  --bg:#EEF1F3; --surface:#FFFFFF; --surface2:#F5F7F8; --fg:#182126; --muted:#56646D; --line:#D3DADF;
+  --copper:#B4541E; --copper-soft:#F6E6DC; --skin:#2A6A8C; --solid:#7B8791; --ok:#2F7A4B; --warn:#A8670A; --bad:#B3362B;
+  --band:rgba(180,84,30,.08);
+  --f-display:'Fraunces','Iowan Old Style',Georgia,serif;
+  --f-body:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101518; --surface:#182025; --surface2:#1E282E; --fg:#E6ECEF; --muted:#93A2AB; --line:#2C3941;
+    --copper:#E58E58; --copper-soft:#33241B; --skin:#6AB4D8; --solid:#8D9AA4; --ok:#6CC38A; --warn:#E0A748; --bad:#EE7B6F;
+    --band:rgba(229,142,88,.09); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101518; --surface:#182025; --surface2:#1E282E; --fg:#E6ECEF; --muted:#93A2AB; --line:#2C3941;
+  --copper:#E58E58; --copper-soft:#33241B; --skin:#6AB4D8; --solid:#8D9AA4; --ok:#6CC38A; --warn:#E0A748; --bad:#EE7B6F;
+  --band:rgba(229,142,88,.09); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body);
+  padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font:600 clamp(26px,4vw,34px)/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font:600 13px/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px}
+h3{font:600 15px/1.3 var(--f-body);margin:0 0 6px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{color:var(--muted);max-width:62ch;margin-top:6px}
+.grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field.wide{grid-column:1/-1}
+label{font-size:12.5px;font-weight:500;color:var(--muted)}
+.row{display:flex;gap:6px;min-width:0}
+input,select,button{font:inherit;color:var(--fg)}
+input[type=number],select{width:100%;min-width:0;height:38px;padding:0 10px;background:var(--surface2);border:1px solid var(--line);border-radius:4px;font-family:var(--f-mono);font-size:14px}
+select{font-family:var(--f-body);font-size:13.5px;padding-right:6px}
+.row select.unit{width:98px;flex:none}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--copper);outline-offset:1px}
+.hint{font-size:12.5px;color:var(--muted);font-family:var(--f-mono)}
+.btn{height:34px;padding:0 12px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:13px;font-weight:500}
+.btn:hover{border-color:var(--copper);color:var(--copper)}
+.btn.link{border:0;padding:0;height:auto;color:var(--copper);text-decoration:underline;text-underline-offset:3px;font-size:12.5px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.presets .btn{height:30px;font-size:12.5px}
+.right{display:flex;flex-direction:column;gap:20px;min-width:0}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.tiles{grid-template-columns:minmax(0,1fr)}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;min-width:0}
+.tile.main{border-color:var(--copper);background:var(--copper-soft)}
+.tile .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.tile .v{font:500 clamp(24px,3.4vw,30px)/1.2 var(--f-mono);margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tile .u{font-size:13px;color:var(--muted);font-family:var(--f-body)}
+.tile .s{font-size:12.5px;color:var(--muted);margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;padding:3px 10px;border-radius:99px;border:1px solid currentColor}
+.badge.ok{color:var(--ok)}.badge.warn{color:var(--warn)}.badge.bad{color:var(--bad)}
+.badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.msg{font-size:13.5px;margin-top:10px;color:var(--muted)}
+.msg.bad{color:var(--bad)}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th,.tbl td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:baseline}
+.tbl th{font-weight:500;color:var(--muted);font-size:12px}
+.tbl td.n,.tbl th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:14px 0 0}
+.facts div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;min-width:0}
+.facts dt{color:var(--muted);font-weight:500}
+.facts dd{margin:0;font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:560px){.facts{grid-template-columns:minmax(0,1fr)}}
+.bar{height:6px;border-radius:3px;background:var(--surface2);margin-top:5px;overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;margin-bottom:8px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend svg{width:26px;height:10px}
+#chart{width:100%;height:auto;display:block;touch-action:pan-y}
+.readout{font:13px/1.4 var(--f-mono);color:var(--muted);min-height:20px;margin-top:6px;font-variant-numeric:tabular-nums}
+svg text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+@media (max-width:560px){svg text{font-size:16px}}
+.method{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+@media (max-width:860px){.method{grid-template-columns:minmax(0,1fr)}}
+.eq{font-family:var(--f-mono);font-size:13px;background:var(--surface2);border-radius:4px;padding:10px 12px;margin:0 0 10px;overflow-x:auto;white-space:pre;line-height:1.6}
+.note{font-size:13.5px;color:var(--muted)}
+footer{font-size:12.5px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Litz Loss Calculator</h1>
+    <p class="lede">AC resistance and winding loss of a litz bundle at one frequency. Skin effect in each strand plus the proximity loss from the bundle's own current, checked against a 2D finite-element model.</p>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="in-h">
+      <h2 id="in-h">Wire and operating point</h2>
+      <div class="presets" role="group" aria-label="Example wires">
+        <button class="btn" type="button" data-p="0">38 AWG × 100</button>
+        <button class="btn" type="button" data-p="1">40 AWG × 420</button>
+        <button class="btn" type="button" data-p="2">44 AWG × 660</button>
+      </div>
+      <div class="fields">
+        <div class="field wide">
+          <label for="d">Strand diameter (bare copper)</label>
+          <div class="row">
+            <input id="d" type="number" inputmode="decimal" step="any" min="0" value="0.101" aria-describedby="d-u">
+            <select id="awg" class="unit" aria-label="Strand AWG size"></select>
+          </div>
+          <span class="hint" id="d-u">mm</span>
+        </div>
+        <div class="field">
+          <label for="N">Strands, N</label>
+          <input id="N" type="number" inputmode="numeric" step="1" min="1" value="100">
+        </div>
+        <div class="field">
+          <label for="Db">Bundle diameter, mm</label>
+          <input id="Db" type="number" inputmode="decimal" step="any" min="0" value="1.5">
+        </div>
+        <div class="field wide">
+          <span class="hint" id="fillhint"></span>
+          <button class="btn link" type="button" id="estDb" style="align-self:flex-start">Estimate bundle diameter for 60 % copper fill</button>
+        </div>
+        <div class="field wide">
+          <label for="f">Frequency</label>
+          <div class="row">
+            <input id="f" type="number" inputmode="decimal" step="any" min="0" value="100">
+            <select id="fu" class="unit" aria-label="Frequency unit"><option value="1e3" selected>kHz</option><option value="1e6">MHz</option><option value="1">Hz</option></select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="I">Current, A rms</label>
+          <input id="I" type="number" inputmode="decimal" step="any" min="0" value="5">
+        </div>
+        <div class="field">
+          <label for="len">Length, m</label>
+          <input id="len" type="number" inputmode="decimal" step="any" min="0" value="1">
+        </div>
+        <div class="field">
+          <label for="T">Temperature, °C</label>
+          <input id="T" type="number" inputmode="decimal" step="any" value="25">
+        </div>
+        <div class="field wide">
+          <label for="tw">Twist length factor</label>
+          <input id="tw" type="number" inputmode="decimal" step="0.01" min="1" value="1.00">
+          <span class="hint">1.00 to 1.05 typical. Strands are longer than the bundle.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="right">
+      <section aria-live="polite" aria-label="Results">
+        <div class="tiles">
+          <div class="tile main"><div class="k">Total loss</div><div class="v"><span id="rP">–</span> <span class="u" id="rPu">W</span></div><div class="s" id="rPs"></div></div>
+          <div class="tile"><div class="k">AC resistance</div><div class="v"><span id="rR">–</span> <span class="u" id="rRu">mΩ</span></div><div class="s" id="rRs"></div></div>
+          <div class="tile"><div class="k">Rac / Rdc</div><div class="v" id="rF">–</div><div class="s" id="rFs"></div></div>
+        </div>
+        <div class="msg" id="msg"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Loss breakdown</h2>
+        <div class="scroll">
+        <table class="tbl" id="tbl">
+          <thead><tr><th>Component</th><th class="n">Loss, W</th><th class="n">Share</th></tr></thead>
+          <tbody>
+            <tr><td>DC (I²·Rdc)<div class="bar"><i id="b0" style="background:var(--solid)"></i></div></td><td class="n" id="t0"></td><td class="n" id="s0"></td></tr>
+            <tr><td>Skin effect, extra<div class="bar"><i id="b1" style="background:var(--skin)"></i></div></td><td class="n" id="t1"></td><td class="n" id="s1"></td></tr>
+            <tr><td>Proximity (internal field)<div class="bar"><i id="b2" style="background:var(--copper)"></i></div></td><td class="n" id="t2"></td><td class="n" id="s2"></td></tr>
+          </tbody>
+        </table>
+        </div>
+        <dl class="facts">
+          <div><dt>DC resistance</dt><dd id="x0"></dd></div>
+          <div><dt>Skin depth δ</dt><dd id="x1"></dd></div>
+          <div><dt>Strand d / δ</dt><dd id="x2"></dd></div>
+          <div><dt>Copper fill</dt><dd id="x3"></dd></div>
+          <div><dt>Resistivity ρ(T)</dt><dd id="x4"></dd></div>
+          <div><dt>Solid wire, same copper</dt><dd id="x5"></dd></div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <h2>Rac / Rdc against frequency</h2>
+        <div class="legend">
+          <span><svg viewBox="0 0 26 10"><line x1="0" y1="5" x2="26" y2="5" stroke="var(--copper)" stroke-width="2.5"/></svg>Litz bundle, total</span>
+          <span><svg viewBox="0 0 26 10"><line x1="0" y1="5" x2="26" y2="5" stroke="var(--skin)" stroke-width="2" stroke-dasharray="5 3"/></svg>Skin effect only</span>
+          <span><svg viewBox="0 0 26 10"><line x1="0" y1="5" x2="26" y2="5" stroke="var(--solid)" stroke-width="2"/></svg>Solid wire, same copper</span>
+        </div>
+        <svg id="chart" viewBox="0 0 640 340" role="img" aria-label="Rac over Rdc against frequency, log scales"></svg>
+        <div class="readout" id="readout">Move over the chart to read values at a frequency.</div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2>Model and checks</h2>
+    <div class="method">
+      <div>
+        <h3>Equations</h3>
+        <p class="note">Each strand has radius r and carries I/N. With γ = (1+j)/δ and δ = √(2ρ / ωμ₀), using modified Bessel functions I₀ and I₁:</p>
+        <div class="eq">Rdc    = ρ·l / (N·π·r²)
+F_skin = Re[ γr·I₀(γr) / (2·I₁(γr)) ]
+P_skin = F_skin · Rdc · I²
+H_i²   = I² / (8π²·R_b²)        (mean square, rms)
+P_prox = N · l · k_p(f) · H_i²
+Rac    = (P_skin + P_prox) / I²</div>
+        <p class="note">k_p is the exact loss per metre in one round strand placed in a uniform transverse field, in W/m per (A/m)² rms. It tends to σ·π·ω²·μ₀²·r⁴/4 at low frequency. R_b is the bundle radius, and the current is assumed uniform over it, which is what a well-transposed litz wire does.</p>
+        <p class="note">Not included: loss from fields outside the bundle (neighbouring turns, air gaps, cores), uneven current sharing, and insulation or serving losses.</p>
+      </div>
+      <div>
+        <h3>Check against 2D finite elements</h3>
+        <p class="note">Hex-packed bundles of 0.1 mm strands (copper fill 69 %), every strand forced to carry I/N, solved as time-harmonic A<sub>z</sub> with a curved 3rd-order mesh in NGSolve. Values are Rac / Rdc.</p>
+        <div class="scroll">
+        <table class="tbl">
+          <thead><tr><th class="n">f</th><th class="n">d/δ</th><th class="n">FEM (37)</th><th class="n">This tool</th><th class="n">Diff</th></tr></thead>
+          <tbody>
+            <tr><td class="n">100 kHz</td><td class="n">0.48</td><td class="n">1.0101</td><td class="n">1.0105</td><td class="n">+0.04 %</td></tr>
+            <tr><td class="n">300 kHz</td><td class="n">0.83</td><td class="n">1.0900</td><td class="n">1.0939</td><td class="n">+0.35 %</td></tr>
+            <tr><td class="n">1 MHz</td><td class="n">1.51</td><td class="n">1.933</td><td class="n">2.009</td><td class="n">+3.9 %</td></tr>
+            <tr><td class="n">2 MHz</td><td class="n">2.14</td><td class="n">4.066</td><td class="n">4.644</td><td class="n">+14 %</td></tr>
+            <tr><td class="n">4 MHz</td><td class="n">3.03</td><td class="n">8.257</td><td class="n">11.585</td><td class="n">+40 %</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="note" style="margin-top:10px">A 19-strand bundle gives the same picture (+0.04 % at 100 kHz, +3.6 % at 1 MHz). Above d/δ of about 2 the strands start to screen each other, which the uniform-field model ignores, so it overestimates loss there. That is the shaded zone on the chart.</p>
+      </div>
+    </div>
+  </section>
+  <footer>Copper resistivity 1.724×10⁻⁸ Ω·m at 20 °C, temperature coefficient 0.00393 /K. Results are estimates for design work and should be confirmed on the real winding.</footer>
+</div>
+
+<script>
+// ---------- physics core (SI) ----------
+const MU0=4e-7*Math.PI;
+const cadd=(a,b)=>[a[0]+b[0],a[1]+b[1]];
+const cmul=(a,b)=>[a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]];
+const cdiv=(a,b)=>{const d=b[0]*b[0]+b[1]*b[1];return[(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d]};
+const cabs2=a=>a[0]*a[0]+a[1]*a[1];
+const cconj=a=>[a[0],-a[1]];
+function besselI01(z){
+  const h=[z[0]/2,z[1]/2],q=cmul(h,h);
+  let t0=[1,0],s0=[1,0],t1=h.slice(),s1=h.slice();
+  for(let k=1;k<800;k++){
+    t0=cmul(t0,q);t0=[t0[0]/(k*k),t0[1]/(k*k)];
+    t1=cmul(t1,q);t1=[t1[0]/(k*(k+1)),t1[1]/(k*(k+1))];
+    s0=cadd(s0,t0);s1=cadd(s1,t1);
+    if(k>3&&cabs2(t0)<1e-34*cabs2(s0)&&cabs2(t1)<1e-34*cabs2(s1))break;
+  }
+  return[s0,s1];
+}
+const resistivity=T=>1.724e-8*(1+0.00393*(T-20));
+function strandAC(d,f,rho){
+  const sigma=1/rho,w=2*Math.PI*f,r=d/2;
+  if(!(f>0))return{FR:1,kp:0,delta:Infinity};
+  const delta=Math.sqrt(2*rho/(w*MU0));
+  const g=[1/delta,1/delta],z=[r/delta,r/delta];
+  const[I0,I1]=besselI01(z);
+  const FR=cdiv(cmul(z,I0),[2*I1[0],2*I1[1]])[0];
+  const C=cdiv([2*MU0,0],cmul(g,I0));
+  const q=cdiv(I1,z);
+  const dI1=[I0[0]-q[0],I0[1]-q[1]];
+  const prod=cmul(cmul(I1,cconj(g)),cconj(dI1));
+  const Ppk=Math.PI*r*w/(2*MU0)*(-prod[1]*cabs2(C));
+  return{FR,kp:2*Ppk,delta};
+}
+function litz(p){
+  const{d,N,Db,len,f,I,T,twist}=p;
+  const rho=resistivity(T),Acu=N*Math.PI*d*d/4,L=len*twist;
+  const Rdc=rho*L/Acu,s=strandAC(d,f,rho);
+  const Hi2=I*I/(8*Math.PI*Math.PI*Math.pow(Db/2,2));
+  const Pdc=Rdc*I*I,Pskin=Pdc*s.FR,Pprox=N*s.kp*L*Hi2,Ptot=Pskin+Pprox;
+  const dSolid=Math.sqrt(4*Acu/Math.PI);
+  return{rho,Acu,Rdc,Pdc,Pskin,Pprox,Ptot,Rac:I>0?Ptot/(I*I):Rdc*(s.FR),FR:s.FR,delta:s.delta,
+    fill:Acu/(Math.PI*Db*Db/4),dSolid,RacSolid:Rdc*strandAC(dSolid,f,rho).FR};
+}
+// ratio only (current-independent): Rac/Rdc for sweeps
+function ratio(p,f){
+  const rho=resistivity(p.T),s=strandAC(p.d,f,rho);
+  const Hi2=1/(8*Math.PI*Math.PI*Math.pow(p.Db/2,2));
+  const Acu=p.N*Math.PI*p.d*p.d/4,Rdc=rho*p.len*p.twist/Acu;
+  const prox=p.N*s.kp*p.len*p.twist*Hi2/Rdc;
+  const dS=Math.sqrt(4*Acu/Math.PI);
+  return{total:s.FR+prox,skin:s.FR,solid:strandAC(dS,f,rho).FR};
+}
+
+// ---------- UI ----------
+const $=id=>document.getElementById(id);
+const PRESETS=[{d:0.101,N:100,Db:1.5,f:100,fu:'1e3',I:5},{d:0.0799,N:420,Db:2.6,f:50,fu:'1e3',I:20},{d:0.0501,N:660,Db:2.3,f:500,fu:'1e3',I:8}];
+const awgD=n=>0.127*Math.pow(92,(36-n)/39);
+const AWGS=[];for(let n=30;n<=48;n+=1)AWGS.push(n);
+$('awg').innerHTML='<option value="">custom</option>'+AWGS.map(n=>`<option value="${n}">${n} AWG</option>`).join('');
+
+function fmt(v,dig=4){
+  if(!isFinite(v))return'–';
+  if(v===0)return'0';
+  const a=Math.abs(v);
+  if(a>=1000||a<0.01)return v.toExponential(dig-1).replace('e+','e');
+  return v.toPrecision(dig).replace(/\.?0+$/,m=>m.includes('.')?'':m);
+}
+function eng(v,unit){ // value in base unit -> [string,prefixed unit]
+  const a=Math.abs(v);
+  const t=[[1e-6,'µ'],[1e-3,'m'],[1,''],[1e3,'k'],[1e6,'M']];
+  let p=t[2];
+  for(const e of t){if(a>=e[0])p=e}
+  if(a===0)p=t[2];
+  return[fmt(v/p[0],4),p[1]+unit];
+}
+function read(){
+  const g=id=>parseFloat($(id).value);
+  return{d:g('d')*1e-3,N:Math.round(g('N')),Db:g('Db')*1e-3,len:g('len'),f:g('f')*parseFloat($('fu').value),I:g('I'),T:g('T'),twist:g('tw')};
+}
+function valid(p){
+  if(!(p.d>0))return'Enter a strand diameter above zero.';
+  if(!(p.N>=1))return'Enter at least one strand.';
+  if(!(p.Db>0))return'Enter a bundle diameter above zero.';
+  if(!(p.len>0))return'Enter a length above zero.';
+  if(!(p.f>0))return'Enter a frequency above zero.';
+  if(!(p.I>=0))return'Enter a current of zero or more.';
+  if(!isFinite(p.T))return'Enter a temperature.';
+  if(!(p.twist>=1))return'The twist factor is 1.00 or more.';
+  if(p.d/ (2*Math.sqrt(2*resistivity(p.T)/(2*Math.PI*p.f*MU0)))>40)return'Strand diameter is more than 80 skin depths at this frequency. Lower the frequency or the diameter.';
+  return'';
+}
+let lastText='';
+function update(){
+  const p=read(),err=valid(p);
+  const fillBox=p.d>0&&p.N>=1&&p.Db>0?(p.N*p.d*p.d/(p.Db*p.Db)):NaN;
+  $('fillhint').textContent=isFinite(fillBox)?`Copper fill ${(fillBox*100).toFixed(0)} % of bundle area`:'';
+  if(isFinite(fillBox)&&fillBox>0.9069){$('fillhint').textContent+=' · impossible, above 90.7 % (hex packing)';}
+  const msg=$('msg');
+  if(err){msg.className='msg bad';msg.textContent=err;return;}
+  const o=litz(p);
+  const[P,Pu]=eng(o.Ptot,'W');$('rP').textContent=P;$('rPu').textContent=Pu;
+  $('rPs').textContent=o.Pdc>0?`${fmt(o.Ptot/o.Pdc,4)}× the DC loss`:'';
+  const[R,Ru]=eng(o.Rac,'Ω');$('rR').textContent=R;$('rRu').textContent=Ru;
+  $('rRs').textContent=`DC: ${eng(o.Rdc,'Ω').join(' ')}`;
+  const F=o.Rac/o.Rdc;$('rF').textContent=fmt(F,4);
+  $('rFs').textContent=`Solid wire, same copper: ${fmt(o.RacSolid/o.Rdc,4)}`;
+  const dd=p.d/o.delta;
+  const parts=[o.Pdc,o.Pskin-o.Pdc,o.Pprox];
+  parts.forEach((v,i)=>{
+    $('t'+i).textContent=fmt(v,4);
+    const sh=o.Ptot>0?v/o.Ptot:0;
+    $('s'+i).textContent=(sh*100<0.01&&sh>0?'<0.01':(sh*100).toFixed(2))+' %';
+    $('b'+i).style.width=(sh*100)+'%';
+  });
+  $('x0').textContent=eng(o.Rdc,'Ω').join(' ');
+  $('x1').textContent=(o.delta*1e6<1000?fmt(o.delta*1e6,3)+' µm':fmt(o.delta*1e3,3)+' mm');
+  $('x2').textContent=fmt(dd,3);
+  $('x3').textContent=(o.fill*100).toFixed(0)+' %';
+  $('x4').textContent=fmt(o.rho*1e8,4)+'×10⁻⁸ Ω·m';
+  $('x5').textContent=`Ø ${fmt(o.dSolid*1e3,3)} mm, ${fmt(o.RacSolid/o.Rdc,4)}× Rdc`;
+  // validity badge
+  let cls,txt;
+  if(dd<=1){cls='ok';txt=`d/δ = ${dd.toFixed(2)}: within about 1 % of finite-element results`;}
+  else if(dd<=2){cls='warn';txt=`d/δ = ${dd.toFixed(2)}: up to about 10 % high versus finite elements`;}
+  else{cls='bad';txt=`d/δ = ${dd.toFixed(2)}: overestimates loss, more than 10 % high. Verify with finite elements`;}
+  msg.className='msg';msg.innerHTML=`<span class="badge ${cls}">${txt}</span>`;
+  lastText=`Litz ${p.N} × ${fmt(p.d*1e3,3)} mm, bundle Ø ${fmt(p.Db*1e3,3)} mm, ${fmt(p.f/1e3,4)} kHz, ${fmt(p.I,3)} A rms: Rdc ${eng(o.Rdc,'Ω').join(' ')}, Rac ${eng(o.Rac,'Ω').join(' ')} (${fmt(F,4)}× Rdc), loss ${eng(o.Ptot,'W').join(' ')}`;
+  drawChart(p,o);
+  try{localStorage.setItem('litz-v1',JSON.stringify(Object.fromEntries(['d','N','Db','f','fu','I','len','T','tw'].map(k=>[k,$(k).value]))))}catch(e){}
+}
+
+// ---------- chart ----------
+const NS='http://www.w3.org/2000/svg';
+const W=640,H=340,M={l:52,r:14,t:12,b:40};
+const FMIN=1e3,FMAX=1e7;
+const X=f=>M.l+(Math.log10(f)-3)/4*(W-M.l-M.r);
+const NICE=[1,1.2,1.5,2,3,5,10,20,50,100,200,500,1000,2000,5000,1e4,2e4,5e4,1e5];
+let chartState=null;
+function el(n,a,txt){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e}
+function drawChart(p,o){
+  const svg=$('chart');svg.innerHTML='';
+  const pts=[];
+  for(let i=0;i<=120;i++){const f=Math.pow(10,3+4*i/120);pts.push({f,...ratio(p,f)});}
+  const here=ratio(p,p.f);
+  const maxv=Math.max(...pts.map(q=>Math.max(q.total,q.solid)),here.total);
+  const ymax=NICE.find(v=>v>=maxv*1.05)||maxv*1.1;
+  const L0=Math.log10(1),L1=Math.log10(ymax);
+  const Y=v=>M.t+(1-(Math.log10(Math.max(v,1))-L0)/(L1-L0))*(H-M.t-M.b);
+  chartState={pts,Y,p};
+  // shaded zone d/delta > 2
+  const rho=resistivity(p.T);
+  const f2=rho/(Math.PI*MU0*Math.pow(p.d/2,2));      // delta = d/2
+  if(f2<FMAX){
+    const x0=Math.max(X(Math.max(f2,FMIN)),M.l);
+    svg.appendChild(el('rect',{x:x0,y:M.t,width:W-M.r-x0,height:H-M.t-M.b,fill:'var(--band)'}));
+    svg.appendChild(el('text',{x:W-M.r-6,y:M.t+14,'text-anchor':'end'},'strand d/δ > 2: model overestimates'));
+  }
+  // grid + y ticks
+  NICE.filter(v=>v<=ymax).forEach(v=>{
+    const y=Y(v);
+    svg.appendChild(el('line',{x1:M.l,x2:W-M.r,y1:y,y2:y,stroke:'var(--line)','stroke-width':v===1?1.5:1}));
+    svg.appendChild(el('text',{x:M.l-8,y:y+4,'text-anchor':'end'},String(v)));
+  });
+  // x ticks
+  const xt=[[1e3,'1 kHz'],[1e4,'10 kHz'],[1e5,'100 kHz'],[1e6,'1 MHz'],[1e7,'10 MHz']];
+  xt.forEach(([f,l],i)=>{
+    const x=X(f);
+    svg.appendChild(el('line',{x1:x,x2:x,y1:M.t,y2:H-M.b,stroke:'var(--line)'}));
+    svg.appendChild(el('text',{x:Math.min(Math.max(x,M.l+12),W-M.r-14),y:H-M.b+18,'text-anchor':'middle'},l));
+  });
+  svg.appendChild(el('text',{x:M.l+(W-M.l-M.r)/2,y:H-6,'text-anchor':'middle'},'Frequency'));
+  const yl=el('text',{x:14,y:M.t+(H-M.t-M.b)/2,'text-anchor':'middle',transform:`rotate(-90 14 ${M.t+(H-M.t-M.b)/2})`},'Rac / Rdc');svg.appendChild(yl);
+  const path=(key)=>pts.map((q,i)=>`${i?'L':'M'}${X(q.f).toFixed(1)} ${Y(q[key]).toFixed(1)}`).join('');
+  svg.appendChild(el('path',{d:path('solid'),fill:'none',stroke:'var(--solid)','stroke-width':2}));
+  svg.appendChild(el('path',{d:path('skin'),fill:'none',stroke:'var(--skin)','stroke-width':2,'stroke-dasharray':'6 4'}));
+  svg.appendChild(el('path',{d:path('total'),fill:'none',stroke:'var(--copper)','stroke-width':2.75,'stroke-linejoin':'round'}));
+  // operating point
+  if(p.f>=FMIN&&p.f<=FMAX){
+    const x=X(p.f),y=Y(here.total);
+    svg.appendChild(el('line',{x1:x,x2:x,y1:M.t,y2:H-M.b,stroke:'var(--copper)','stroke-dasharray':'2 3'}));
+    svg.appendChild(el('circle',{cx:x,cy:y,r:5,fill:'var(--surface)',stroke:'var(--copper)','stroke-width':2.5}));
+    const right=x>W-120;
+    svg.appendChild(el('text',{x:right?x-10:x+10,y:Math.max(y-10,M.t+26),'text-anchor':right?'end':'start',style:'fill:var(--fg);font-weight:500'},fmt(here.total,3)));
+  }
+  svg.appendChild(el('rect',{id:'hit',x:M.l,y:M.t,width:W-M.l-M.r,height:H-M.t-M.b,fill:'transparent'}));
+  $('readout').textContent='Move over the chart to read values at a frequency.';
+}
+function onMove(ev){
+  if(!chartState)return;
+  const svg=$('chart'),r=svg.getBoundingClientRect();
+  const x=(ev.clientX-r.left)/r.width*W;
+  if(x<M.l||x>W-M.r)return;
+  const f=Math.pow(10,3+(x-M.l)/(W-M.l-M.r)*4);
+  const q=ratio(chartState.p,f);
+  const fs=f>=1e6?fmt(f/1e6,3)+' MHz':fmt(f/1e3,3)+' kHz';
+  $('readout').textContent=`${fs}   litz ${fmt(q.total,3)}   skin only ${fmt(q.skin,3)}   solid ${fmt(q.solid,3)}`;
+}
+$('chart').addEventListener('pointermove',onMove);
+$('chart').addEventListener('pointerdown',onMove);
+
+// ---------- wiring ----------
+function syncAwg(){
+  const d=parseFloat($('d').value);let m='';
+  for(const n of AWGS){if(Math.abs(awgD(n)-d)<0.0006){m=String(n)}}
+  $('awg').value=m;
+}
+$('awg').addEventListener('change',()=>{if($('awg').value){$('d').value=awgD(+$('awg').value).toFixed(4).replace(/0+$/,'');update();}});
+$('d').addEventListener('input',()=>{syncAwg();});
+$('estDb').addEventListener('click',()=>{
+  const d=parseFloat($('d').value),N=parseFloat($('N').value);
+  if(d>0&&N>=1){$('Db').value=(d*Math.sqrt(N/0.6)).toPrecision(3);update();}
+});
+document.querySelectorAll('.presets .btn').forEach(b=>b.addEventListener('click',()=>{
+  const q=PRESETS[+b.dataset.p];
+  $('d').value=q.d;$('N').value=q.N;$('Db').value=q.Db;$('f').value=q.f;$('fu').value=q.fu;$('I').value=q.I;
+  syncAwg();update();
+}));
+['d','N','Db','f','fu','I','len','T','tw'].forEach(k=>$(k).addEventListener('input',update));
+try{
+  const s=JSON.parse(localStorage.getItem('litz-v1')||'null');
+  if(s)for(const k in s){if($(k)&&s[k]!=null)$(k).value=s[k]}
+}catch(e){}
+syncAwg();update();
+</script>
